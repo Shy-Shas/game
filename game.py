@@ -30,7 +30,7 @@ class dices:
         return roll
 
 class char:
-    def __init__(self, name:str, element:str, maxHealth:int, dmg:int, res:int, specials:list):
+    def __init__(self, name:str, element:str, maxHealth:int, dmg:int, res:int, specials:dict):
         self.name = name
         self.element = element
         self.maxHealth = maxHealth
@@ -58,10 +58,10 @@ class char:
     def use_special(self, special, other):
         from re import findall
         effect = ALL_SPECIALS[special]['effect']
-        pp = ALL_SPECIALS[special]['uses']
+        pp = self.specials[special]
 
         if pp > 0:
-            ALL_SPECIALS[special]['uses'] -= 1
+            self.specials[special] -= 1
 
         if special in ALL_SPECIALS.keys() and pp > 0:
             print(f'{self.name} used {special}')
@@ -89,6 +89,18 @@ class char:
             elif 'health' in effect:
                 healing = int(findall(r'\d+', effect)[0])
                 print(f'heals for {healing} points!')
+
+                for dice in dices.ALL_DICES:
+                    if dice in effect:
+                        match dice:
+                            case 'd20':
+                                healing += dices.d20Roll()
+                            case 'd10':
+                                healing += dices.d10Roll()
+                            case 'd6':
+                                healing += dices.d6Roll() 
+                        break
+
                 self.health += healing
                 if self.health > self.maxHealth:
                     self.health = self.maxHealth
@@ -101,31 +113,33 @@ class playerChar(char):
         self.XPnextLevel = 50
 
     def levelUP(self):
-        print(f'{self.name} leveld to level {self.Level}')
-        self.XP = 0
-        XPnextLevel *= 1,1
+        self.XPnextLevel = round(self.XPnextLevel * 1.1)
         self.Level += 1
 
         self.maxHealth += 10
         self.dmg += 5
         self.res += 1
 
+        print(f'{self.name} leveld to level {self.Level}')
+
         if len(self.specials) != len(list(ALL_SPECIALS.keys())):
             newSpecial = choice(list(ALL_SPECIALS.keys()))
-            while newSpecial in self.specials:
+            while newSpecial in self.specials.keys():
                 newSpecial = choice(list(ALL_SPECIALS.keys()))
-            self.specials.append(newSpecial)
+            self.specials[newSpecial] = ALL_SPECIALS[newSpecial]['uses']
+        
+            print(f'learnded new spell: {newSpecial} !')
         
     
     def gainXP(self, amount:int):
         print(f'{self.name} gained {amount} XP!')
         self.XP += amount
 
-        if self.XP >= self.XPnextLevel:
+        while self.XP >= self.XPnextLevel:
             self.XP -= self.XPnextLevel
             self.levelUP()
+            print(f'current XP: {self.XP} || xp to next level: {self.XPnextLevel}')
         
-        print(f'current XP: {self.XP} || xp to next level: {self.XPnextLevel}')
 
 #functions area
 def okCheck():
@@ -133,7 +147,7 @@ def okCheck():
 
 def randomEnemy(dif):
     enemyTipe = choice(list(ELEMENT_REACTIONS.keys()))
-    specials = []
+    specials = {}
 
     if dif == 'easy':
         difMod = 1
@@ -149,22 +163,22 @@ def randomEnemy(dif):
         spell = choice(list(ALL_SPECIALS.keys()))
         while spell in specials and enemyTipe.upper() not in spell:
             spell = choice(list(ALL_SPECIALS.keys()))
-        specials.append(spell)
+        specials[spell] = ALL_SPECIALS[spell]['uses']
     
     return char('enemy', enemyTipe, randint(15, 20*difMod), randint(5, 7*difMod), randint(0, 3*difMod), specials)
 
-# def debugEnemy(enemy:char, allActions:dict, toughts:dict, action:str):
-#     print('ENEMY DEBUGGER !!!!!')
-#     for s in enemy.specials:
-#         print(f"{s} - {ALL_SPECIALS[s]['effect']}:{ALL_SPECIALS[s]['uses']}PP")
-#     print(f'all actions: {allActions}\ntoughts: {toughts}\naction: {action}')
+def debugEnemy(enemy:char, allActions:dict, toughts:dict, action:str):
+    print('ENEMY DEBUGGER !!!!!')
+    for s in enemy.specials:
+        print(f"{s} - {ALL_SPECIALS[s]['effect']}:{ALL_SPECIALS[s]['uses']}PP")
+    print(f'all actions: {allActions}\ntoughts: {toughts}\naction: {action}')
 
 def enemyAI(enemy:char, player:char):
     possibleActions = {
         'attack':2,
     }
-    for s in enemy.specials:
-        possibleActions[s] = 5
+    for s in enemy.specials.keys():
+        possibleActions[s] = 1
 
     if 'grace' in possibleActions and enemy.health < enemy.maxHealth/2:
         possibleActions['grace'] = 2
@@ -185,7 +199,7 @@ def enemyAI(enemy:char, player:char):
     elif 'damage' in ALL_SPECIALS[choosenAction]['effect']:
         enemy.use_special(choosenAction, player)
     
-    #debugEnemy(enemy, possibleActions, thought, choosenAction)
+    debugEnemy(enemy, possibleActions, thought, choosenAction)
 
 def setWorldDif(playerLvl):
     if playerLvl == 1:
@@ -201,13 +215,13 @@ def setWorldDif(playerLvl):
 
 #-------------------------------main program running-------------------------------#
 
-player = playerChar('Shy', 'fire', 100, 10, 2, [])
+player = playerChar('Shy', 'fire', 100, 10, 2, {})
 
 difficulty = setWorldDif(player.Level)
 enemy1 = randomEnemy(difficulty)  
 
-replay = ''
-while replay != 'no' or 'n':
+running = True
+while running:
     while player.health and enemy1.health > 0:
         print(f'{player.name} : {player.element} || {enemy1.name} : {enemy1.element}')
         print(f'health: {player.health} || health: {enemy1.health} \n')
@@ -229,8 +243,14 @@ while replay != 'no' or 'n':
                 case 'special' if len(player.specials) > 0:
                     print('specials list:')
                     for s in player.specials:
-                        print(f"{s} - {ALL_SPECIALS[s]['effect']}:{ALL_SPECIALS[s]['uses']}PP")
-                    player.use_special(input('choose the special: '), enemy1)
+                        print(f"{s} - {ALL_SPECIALS[s]['effect']}:{player.specials[s]}PP")
+                    while True:
+                        choosenSpell = input('choose the special: ')
+                        if player.specials[choosenSpell] > 0:
+                            break
+                        else:
+                            ('The spell has no PP left !!!')
+                    player.use_special(choosenSpell, enemy1)
                     okCheck()
                     break
                 case _:
@@ -254,18 +274,26 @@ while replay != 'no' or 'n':
     else:
         print('player wins !!!')
 
-        xp = (enemy1.maxHealth + enemy1.dmg + enemy1.res) / 10
+        xp = enemy1.maxHealth + enemy1.dmg + enemy1.res
         player.gainXP(xp)
 
     #-----------------------------#
 
-    replay = input('keep going (yes/no): ')
-    while replay != 'yes' and 'no' and 'y' and 'n':
+    while True:
         replay = input('keep going (yes/no): ')
-    
-    print('A NEW FOE APPEARD !!!')
-    player.health = player.maxHealth
-        
-    enemy1 = randomEnemy()
+        match replay:
+            case 'yes' | 'y':
+                print('A NEW FOE APPEARD !!!')
+                okCheck()
+                player.health = player.maxHealth
+                    
+                enemy1 = randomEnemy(difficulty)
 
-    system('cls' if name == 'nt' else 'clear')
+                system('cls' if name == 'nt' else 'clear')
+                break
+            case 'no' | 'n':
+                running = False
+                break
+            case _:
+                print('Unhandled answer, please tipe again !')
+    
