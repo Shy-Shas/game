@@ -1,34 +1,15 @@
 #imports area
 from random import choice, randint
 from os import system, name
+import spellsFunctions
 
 #consts area
-ALL_SPECIALS = {'fireball':{'effect':'10 damage + d10', 'type':'fire', 'uses':2},
-                'firebolt':{'effect':'12 damage', 'type':'fire', 'uses':5},
-                'grace':{'effect':'+3 health + d6', 'type':'grass', 'uses':5},
-                'sleep':{'effect':"d20  min10 -> enemy sleeps for 1 turn", 'type':'grass', 'uses':2}}
+ALL_SPECIALS = spellsFunctions.SPECIALS
 
-ELEMENT_REACTIONS = {'fire':['grass', 'ice'],
-                     'grass':['rock']}
+ELEMENT_REACTIONS = spellsFunctions.REACTIONS
 
 #classes area
-class dices:
-    ALL_DICES = ['d6', 'd10', 'd20']
-
-    def d6Roll():
-        roll = randint(1, 7)
-        print(f'd6 rolls a {roll}')
-        return roll
-    
-    def d10Roll():
-        roll = randint(1, 11)
-        print(f'd10 rolls a {roll}')
-        return roll
-    
-    def d20Roll():
-        roll = randint(1, 21)
-        print(f'd20 rolls a {roll}')
-        return roll
+dices = spellsFunctions.dices
 
 class char:
     def __init__(self, name:str, element:str, maxHealth:int, dmg:int, res:int, specials:dict):
@@ -39,7 +20,7 @@ class char:
         self.res = res
         self.specials = specials
 
-        self.health = maxHealth
+        self.health = max(0, maxHealth)
         self.status = []
 
     def canAct(self):
@@ -66,8 +47,6 @@ class char:
     
     def use_special(self, special, other):
         if self.canAct():
-            from re import findall
-            effect = ALL_SPECIALS[special]['effect']
             pp = self.specials[special]
 
             if pp > 0:
@@ -76,82 +55,41 @@ class char:
             if special in ALL_SPECIALS.keys() and pp > 0:
                 print(f'{self.name} used {special}')
 
-                if 'damage' in effect:
-                    damage = int(findall(r'\d+', effect)[0])
-                    element = ALL_SPECIALS[special]['type']
+                match special:
+                    case 'fireball':
+                        spellsFunctions.fireball(other)
+                    case 'firebolt':
+                        spellsFunctions.firebolt(other)
+                    case 'lava ground':
+                        spellsFunctions.lavaGround(self.name, other)
+                    case 'grace':
+                        spellsFunctions.grace(self)
+                    case 'sleep':
+                        spellsFunctions.sleep(self.name, other)
+                    case 'thorn rain':
+                        spellsFunctions.thornRain(other)
 
-                    for dice in dices.ALL_DICES:
-                        if dice in effect:
-                            match dice:
-                                case 'd20':
-                                    damage += dices.d20Roll()
-                                case 'd10':
-                                    damage += dices.d10Roll()
-                                case 'd6':
-                                    damage += dices.d6Roll() 
-                            break
-                    
-                    if element in ELEMENT_REACTIONS[element]:
-                        damage *= 2
 
-                    other.health -= damage
-                    if other.health < 0:
-                                other.health = 0
+    def updateStatus(self):
+        sl = self.status
+        if len(sl) > 0:
+            if 'sleep' in sl:
+                sl.remove('sleep')
 
-                    print(f'{special} does {damage} damage!')
+                if 'sleep' in sl:
+                    print(f'{self.name} is still sleeping!')
+                else:
+                    print(f'{self.name} woke up!')
+            
+            if 'burn' in sl:
+                self.health -= 7
+                print(f'{self.name} takes 2 damage from burn!')
+                sl.remove('burn')
 
-                elif 'health' in effect:
-                    healing = int(findall(r'\d+', effect)[0])
-                    print(f'heals for {healing} points!')
-
-                    for dice in dices.ALL_DICES:
-                        if dice in effect:
-                            match dice:
-                                case 'd20':
-                                    healing += dices.d20Roll()
-                                case 'd10':
-                                    healing += dices.d10Roll()
-                                case 'd6':
-                                    healing += dices.d6Roll() 
-                            break
-
-                    self.health += healing
-                    if self.health > self.maxHealth:
-                        self.health = self.maxHealth
-
-                elif 'sleeps' in effect:
-                    minRoll = int(findall(r'\d+', effect)[1])
-                    roll = 0
-
-                    duration = int(findall(r'\d+', effect)[2])
-
-                    for dice in dices.ALL_DICES:
-                        if dice in effect:
-                            match dice:
-                                case 'd20':
-                                    roll= dices.d20Roll()
-                                case 'd10':
-                                    roll= dices.d10Roll()
-                                case 'd6':
-                                    roll= dices.d6Roll() 
-                            break
-
-                    if roll >= minRoll:
-                        for i in range(duration):
-                            other.status.append('sleep')
-                        print(f'{other.name} fell asleep!')
-                    else:
-                        print(f'{self.name} missed the spell !')
-
-    def removeStatus(self):
-        statusList = self.status
-        if not self.canAct():
-            statusList.remove('sleep')
-
-            if 'sleep' in statusList:
-                print(f'{self} is still sleeping!')
-            else:
-                print(f'{self.name} woke up!')
+                if 'burn' in sl:
+                    print(f'{self.name} is still burning!')
+                else:
+                    print(f'{self.name} is not burning anymore!')
 
 
 class playerChar(char):
@@ -214,19 +152,17 @@ def randomEnemy(dif):
         while spell in specials and enemyTipe.upper() not in spell:
             spell = choice(list(ALL_SPECIALS.keys()))
         specials[spell] = ALL_SPECIALS[spell]['uses']
-    
-    return char('enemy', enemyTipe, randint(15, 20*difMod), randint(5, 7*difMod), randint(0, 3*difMod), specials)
 
-# def debugEnemy(enemy:char, allActions:dict, toughts:dict, action:str):
-#     print('ENEMY DEBUGGER !!!!!')
-#     for s in enemy.specials:
-#         print(f"{s} - {ALL_SPECIALS[s]['effect']}:{ALL_SPECIALS[s]['uses']}PP")
-#     print(f'all actions: {allActions}\ntoughts: {toughts}\naction: {action}')
+    return char('enemy', enemyTipe, randint(15*difMod, 20*difMod), randint(5*difMod, 7*difMod), randint(0+difMod, 3*difMod), specials)
+
+def debugEnemy(enemy:char, allActions:dict, toughts:dict, action:str):
+    print('ENEMY DEBUGGER !!!!!')
+    for s in enemy.specials:
+        print(f"{s} - {ALL_SPECIALS[s]['effect']}:{ALL_SPECIALS[s]['uses']}PP")
+    print(f'all actions: {allActions}\ntoughts: {toughts}\naction: {action}')
 
 def enemyAI(enemy:char, player:char):
-    possibleActions = {
-        'attack':2,
-    }
+    possibleActions = {'attack':1}
     for s in enemy.specials.keys():
         possibleActions[s] = 1
 
@@ -244,14 +180,14 @@ def enemyAI(enemy:char, player:char):
     
     if choosenAction == 'attack':
         enemy.attack(player)
-    elif 'health' in ALL_SPECIALS[choosenAction]['effect']:
-        enemy.use_special(choosenAction, enemy)
-    elif 'damage' in ALL_SPECIALS[choosenAction]['effect']:
+    elif choosenAction in ALL_SPECIALS.keys():
         enemy.use_special(choosenAction, player)
     
     #debugEnemy(enemy, possibleActions, thought, choosenAction)
 
 def setWorldDif(playerLvl):
+    dif = 'easy'
+
     if playerLvl == 1:
         dif = 'easy'
     elif playerLvl == 3:
@@ -259,7 +195,7 @@ def setWorldDif(playerLvl):
     elif playerLvl == 5:
         dif = 'hard'
     elif playerLvl >= 7:
-        dif == 'impossible'
+        dif = 'impossible'
     
     return dif
 
@@ -281,7 +217,7 @@ while running:
         print(f'{player.name} : {player.element} || {enemy.name} : {enemy.element}')
         print(f'health: {player.health} || health: {enemy.health} \n')
 
-        player.removeStatus()
+        player.updateStatus()
 
         while True:
             if player.canAct():
@@ -292,38 +228,50 @@ while running:
                         print(f"- {a}")
 
                 action = input('what will you do: ')
-                match action:
-                    case 'attack':
-                        player.attack(enemy)
-                        okCheck()
+
+                if action in player.specials.keys(): 
+                    if player.specials[action] > 0:
+                        player.use_special(action, enemy)
                         break
-                    case 'special' if len(player.specials) > 0:
-                        print('specials list:')
-                        for s in player.specials:
-                            print(f"{s} - {ALL_SPECIALS[s]['effect']} : {player.specials[s]}PP")
-                        while True:
-                            choosenSpell = input('choose the special: ')
-                            if player.specials[choosenSpell] > 0:
-                                break
-                            else:
-                                ('The spell has no PP left !!!')
-                        player.use_special(choosenSpell, enemy)
-                        okCheck()
-                        break
-                    case 'info':
-                        print(player.name)
-                        print(f'element: {player.element} | Level: {player.Level}')
-                        print(f'Current XP: {player.XP} | XP to next level: {player.XPnextLevel}')
-                        print(f'health: {player.health}\ndamage: {player.dmg}\nresistance: {player.res}')
-                        print('specials:')
-                        for s in player.specials:
-                            print(f'-{s} ->\n'
-                                f"  effect: {ALL_SPECIALS[s]['effect']}\n"
-                                f"  type: {ALL_SPECIALS[s]['type']}"
-                                f"  PP: {ALL_SPECIALS[s]['uses']}\n")
-                    case _:
-                        print('invalid input !')
-        
+                    else:
+                        print('spell without PP !!!')
+                elif action in player.specials.keys() and action in ALL_SPECIALS.keys():
+                    print('you dont have that spell!')
+                else:
+                    match action:
+                        case 'attack':
+                            player.attack(enemy)
+                            okCheck()
+                            break
+                        case 'special' if len(player.specials) > 0:
+                            print('specials list:')
+                            for s in player.specials:
+                                print(f"{s} - {ALL_SPECIALS[s]['effect']} : {player.specials[s]}PP")
+                            while True:
+                                choosenSpell = input('choose the special: ')
+                                if choosenSpell in player.specials.keys() and player.specials[choosenSpell] > 0:
+                                    break
+                                elif choosenSpell not in player.specials.keys():
+                                    print("You don't have that spell !!!")
+                                else:
+                                    ('The spell has no PP left !!!')
+                            player.use_special(choosenSpell, enemy)
+                            okCheck()
+                        case 'info':
+                            print(player.name)
+                            print(f'element: {player.element} | Level: {player.Level}')
+                            print(f'Current XP: {player.XP} | XP to next level: {player.XPnextLevel}')
+                            print(f'health: {player.health}\ndamage: {player.dmg}\nresistance: {player.res}')
+                            print('specials:')
+                            for s in player.specials:
+                                print(f'-{s} ->\n'
+                                    f"  effect: {ALL_SPECIALS[s]['effect']}\n"
+                                    f"  type: {ALL_SPECIALS[s]['type']}"
+                                    f"  PP: {ALL_SPECIALS[s]['uses']}\n")
+                        case _:
+                            print('invalid input !')
+            else:
+                break
         print('-----------')
         print(f'{player.name} : {player.element} || {enemy.name} : {enemy.element}')
         print(f'health: {player.health} || health: {enemy.health} \n')
@@ -331,13 +279,13 @@ while running:
         if enemy.health > 0 and enemy.canAct():
             print('ENEMY TURN !')
             enemyAI(enemy, player)
-        elif not enemy.canAct():
-            print(f'{enemy.name} is sleeping!')
+        elif enemy.health <= 0:
+            print(f'{enemy.name} died!!!')
+
+        if len(enemy.status) > 0 and enemy.health > 0:
+                enemy.updateStatus()
 
         okCheck()
-        if len(enemy.status) > 0:
-            enemy.removeStatus()
-            okCheck()
         print('----------------------------------------\n')
 
     print(f'{player.name} : {player.element} || {enemy.name} : {enemy.element}')
@@ -351,6 +299,7 @@ while running:
         xp = enemy.maxHealth + enemy.dmg + enemy.res
         player.gainXP(xp)
 
+
     #-----------------------------#
 
     while True:
@@ -362,8 +311,9 @@ while running:
                 player.health = player.maxHealth
                 for s in player.specials:
                     player.specials[s] = ALL_SPECIALS[s]['uses']
-                    
-                enemy1 = randomEnemy(difficulty)
+                
+                difficulty = setWorldDif(player.Level)
+                enemy = randomEnemy(difficulty)
 
                 system('cls' if name == 'nt' else 'clear')
                 break
