@@ -1,12 +1,16 @@
 #imports area
 from random import choice, randint
 from os import system, name
+
 import spellsFunctions
+import itemsFile
 
 #consts area
 ALL_SPECIALS = spellsFunctions.SPECIALS
 
 ELEMENT_REACTIONS = spellsFunctions.REACTIONS
+
+ITEMS_LIST = itemsFile.ITEMS_DICT
 
 #classes area
 dices = spellsFunctions.dices
@@ -20,8 +24,9 @@ class char:
         self.res = res
         self.specials = specials
 
-        self.health = max(0, maxHealth)
+        self.health = maxHealth
         self.status = []
+        self.inv:dict = {}
 
     def canAct(self):
         if 'sleep' in self.status:
@@ -36,14 +41,13 @@ class char:
                 damage = (dices.d6Roll() + self.dmg - other.res) * 2
                 other.health -= damage
                 print(f'{self.name} attacked with {damage} damage!')
-                if other.health < 0:
-                    other.health = 0
             else:
                 damage = dices.d6Roll() + self.dmg - other.res
                 other.health -= damage
                 print(f'{self.name} attacked with {damage} damage!')
-                if other.health < 0:
-                    other.health = 0
+            
+            other.correctHealth()
+            self.correctHealth()
     
     def use_special(self, special, other):
         if self.canAct():
@@ -68,7 +72,12 @@ class char:
                         spellsFunctions.sleep(self.name, other)
                     case 'thorn rain':
                         spellsFunctions.thornRain(other)
+            
+            other.correctHealth()
+            self.correctHealth()
 
+    def useItemDef( self, item):
+        itemsFile.item.useItem(item, self)
 
     def updateStatus(self):
         sl = self.status
@@ -91,6 +100,12 @@ class char:
                 else:
                     print(f'{self.name} is not burning anymore!')
 
+    def correctHealth(self):
+        if self.health > self.maxHealth:
+            self.health = self.maxHealth
+        
+        if self.health < 0:
+            self.health = 0
 
 class playerChar(char):
     def __init__(self, name, element, maxHealth, dmg, res, specials):
@@ -204,6 +219,7 @@ def setWorldDif(playerLvl):
 #----------------------------------------------------------------------------------#
 
 player = playerChar('Shy', 'fire', 100, 10, 2, {'sleep':2})
+player.inv['health potion'] = 1
 
 difficulty = setWorldDif(player.Level)
 enemy = randomEnemy(difficulty)  
@@ -221,7 +237,7 @@ while running:
 
         while True:
             if player.canAct():
-                moves = ['attack', 'special', 'info']
+                moves = ['attack', 'special', 'items', 'info']
                 print("actions:")
                 for a in moves:
                     if a != 'special' or len(player.specials) > 0:
@@ -229,46 +245,63 @@ while running:
 
                 action = input('what will you do: ')
 
-                if action in player.specials.keys(): 
-                    if player.specials[action] > 0:
-                        player.use_special(action, enemy)
+                
+                match action:
+                    case 'attack':
+                        player.attack(enemy)
+                        okCheck()
                         break
-                    else:
-                        print('spell without PP !!!')
-                elif action in player.specials.keys() and action in ALL_SPECIALS.keys():
-                    print('you dont have that spell!')
-                else:
-                    match action:
-                        case 'attack':
-                            player.attack(enemy)
-                            okCheck()
+                    case 'special' if len(player.specials) > 0:
+                        print('specials list:')
+                        for s in player.specials:
+                            print(f"{s} - {ALL_SPECIALS[s]['effect']} : {player.specials[s]}PP")
+                        while True:
+                            choosenSpell = input('choose the special: ')
+                            if choosenSpell in player.specials.keys() and player.specials[choosenSpell] > 0:
+                                break
+                            elif choosenSpell not in player.specials.keys():
+                                print("You don't have that spell !!!")
+                            else:
+                                ('The spell has no PP left !!!')
+                        player.use_special(choosenSpell, enemy)
+                        okCheck()
+                    case 'items':
+                        print('inventory:')
+                        for it, qntt in player.inv.items():
+                            print(f'{it} * {qntt} -> ')
+                        
+                        choosenItem = input('choose an item or write "back": ')
+                        if choosenItem in player.inv.keys():
+                            player.useItemDef(choosenItem)
                             break
-                        case 'special' if len(player.specials) > 0:
-                            print('specials list:')
-                            for s in player.specials:
-                                print(f"{s} - {ALL_SPECIALS[s]['effect']} : {player.specials[s]}PP")
-                            while True:
-                                choosenSpell = input('choose the special: ')
-                                if choosenSpell in player.specials.keys() and player.specials[choosenSpell] > 0:
-                                    break
-                                elif choosenSpell not in player.specials.keys():
-                                    print("You don't have that spell !!!")
-                                else:
-                                    ('The spell has no PP left !!!')
-                            player.use_special(choosenSpell, enemy)
+                        elif choosenItem == 'back':
+                            continue
+                        else:
+                            print('invalid item!')
+                    case 'info':
+                        print(player.name)
+                        print(f'element: {player.element} | Level: {player.Level}')
+                        print(f'Current XP: {player.XP} | XP to next level: {player.XPnextLevel}')
+                        print(f'health: {player.health}/{player.maxHealth}\ndamage: {player.dmg}\nresistance: {player.res}')
+                        print('specials:')
+                        for s in player.specials:
+                            print(f'-{s} ->\n'
+                                f"  effect: {ALL_SPECIALS[s]['effect']}\n"
+                                f"  type: {ALL_SPECIALS[s]['type']}"
+                                f"  PP: {ALL_SPECIALS[s]['uses']}\n")
+                    case _:
+                        if action in player.specials.keys(): 
+                            if player.specials[action] > 0:
+                                player.use_special(action, enemy)
+                                okCheck()
+                                break
+                            else:
+                                print('spell without PP !!!')
+                                okCheck()
+                        elif action in player.specials.keys() and action in ALL_SPECIALS.keys():
+                            print('you dont have that spell!')
                             okCheck()
-                        case 'info':
-                            print(player.name)
-                            print(f'element: {player.element} | Level: {player.Level}')
-                            print(f'Current XP: {player.XP} | XP to next level: {player.XPnextLevel}')
-                            print(f'health: {player.health}\ndamage: {player.dmg}\nresistance: {player.res}')
-                            print('specials:')
-                            for s in player.specials:
-                                print(f'-{s} ->\n'
-                                    f"  effect: {ALL_SPECIALS[s]['effect']}\n"
-                                    f"  type: {ALL_SPECIALS[s]['type']}"
-                                    f"  PP: {ALL_SPECIALS[s]['uses']}\n")
-                        case _:
+                        else:
                             print('invalid input !')
             else:
                 break
