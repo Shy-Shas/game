@@ -46,6 +46,9 @@ class char:
                 other.health -= damage
                 print(f'{self.name} attacked with {damage} damage!')
             
+            if 'thorns' in self.status:
+                self.thornsStatus()
+            
             other.correctHealth()
             self.correctHealth()
     
@@ -60,25 +63,13 @@ class char:
                 print(f'{self.name} used {special}')
                 spellsFunctions.shieldStatus(self)
 
-                match special:
-                    case 'fireball':
-                        spellsFunctions.fireball(self, other)
-                    case 'firebolt':
-                        spellsFunctions.firebolt(self, other)
-                    case 'lava ground':
-                        spellsFunctions.lavaGround(self.name, other)
-                    case 'grace':
-                        spellsFunctions.grace(self)
-                    case 'sleep':
-                        spellsFunctions.sleep(self.name, other)
-                    case 'thorn rain':
-                        spellsFunctions.thornRain(self, other)
+                spellsFunctions.useSpell(special, other, self)
             
             other.correctHealth()
             self.correctHealth()
 
-    def useItemDef(item, self, other):
-        itemsFile.item.useItem(item, self, other)
+    def useItemDef(self, item, other):
+        itemsFile.useItem(self, item, other)
 
     def updateStatus(self):
         sl = self.status
@@ -113,10 +104,11 @@ class char:
                 else:
                     print(f'{self.name} is not poisoned anymore!')
             
-            #if there's thorns, it will be handled in the attack function
     
     def thornsStatus(self):
         if 'thorns' in self.status:
+            self.health -= 5
+            print(f'{self.name} took 5 damage from thorns!')
             self.status.remove('thorns')
 
             if 'thorns' in self.status:
@@ -160,6 +152,10 @@ class playerChar(char):
         self.res += 1
 
         print(f'{self.name} leveld to level {self.Level}')
+
+        for s in player.specials:
+                    player.specials[s] = ALL_SPECIALS[s]['uses']
+        print('restored all spells PP!')
 
         if len(self.specials) != len(list(ALL_SPECIALS.keys())):
             newSpecial = choice(list(ALL_SPECIALS.keys()))
@@ -262,7 +258,7 @@ def setWorldDif(playerLvl):
 #-------------------------------main program running-------------------------------#
 #----------------------------------------------------------------------------------#
 
-player = playerChar('Shy', 'fire', 100, 10, 2, {'firebolt':3})
+player = playerChar('Shy', 'fire', 50, 5, 2, {'firebolt':ALL_SPECIALS['firebolt']['uses']})
 addItemToInv(player.inv)
 
 difficulty = setWorldDif(player.Level)
@@ -296,25 +292,24 @@ while running:
                         okCheck()
                         break
                     case 'special' if len(player.specials) > 0:
-                        print('specials list:')
                         for s in player.specials:
-                            print('specials:')
+                            print('specials list:')
                             print(f"{s} - {ALL_SPECIALS[s]['effect']} : {player.specials[s]}PP")
 
-                            choosenSpell = input('choose the special or type "back": ')
-                            if choosenSpell in player.specials.keys(): 
-                                if player.specials[choosenSpell] > 0:
-                                    player.use_special(choosenSpell, enemy)
-                                    okCheck()
-                                    break
-                                else:
-                                    ('The spell has no PP left !!!')
-                            elif choosenSpell in ALL_SPECIALS.keys():
-                                print("You don't have that spell !!!")
-                            elif choosenSpell == 'back':
-                                continue
+                        choosenSpell = input('choose the special or type "back": ')
+                        if choosenSpell in player.specials.keys(): 
+                            if player.specials[choosenSpell] > 0:
+                                player.use_special(choosenSpell, enemy)
+                                okCheck()
+                                break
                             else:
-                                print('invalid spell!')
+                                ('The spell has no PP left !!!')
+                        elif choosenSpell in ALL_SPECIALS.keys():
+                            print("You don't have that spell !!!")
+                        elif choosenSpell == 'back':
+                            continue
+                        else:
+                            print('invalid spell!')
                     case 'items':
                         print('inventory:')
                         for it, qntt in player.inv.items():
@@ -322,7 +317,7 @@ while running:
                         
                         choosenItem = input('choose an item or write "back": ')
                         if choosenItem in player.inv.keys():
-                            player.useItemDef(choosenItem)
+                            player.useItemDef(choosenItem, enemy)
                             break
                         elif choosenItem == 'back':
                             continue
@@ -395,8 +390,6 @@ while running:
                 print('A NEW FOE APPEARD !!!')
                 okCheck()
                 player.health = player.maxHealth
-                for s in player.specials:
-                    player.specials[s] = ALL_SPECIALS[s]['uses']
                 
                 difficulty = setWorldDif(player.Level)
                 enemy = randomEnemy(difficulty)

@@ -1,6 +1,6 @@
 SPECIALS = {
     'fireball':{'effect':'10 damage + d10', 'type':'fire', 'uses':2},
-    'firebolt':{'effect':'12 damage', 'type':'fire', 'uses':5},
+    'firebolt':{'effect':'13 damage', 'type':'fire', 'uses':5},
     'lava ground':{'effect':'(if d20 >=15) enemy burns for 5 turns', 'type':'fire','uses':3},
 
     'grace':{'effect':'+3 health + d10', 'type':'grass', 'uses':5},
@@ -34,6 +34,7 @@ class dices:
 
 def cew(targetElement:str, spellType): #Check Elemental Weakness
     if targetElement in REACTIONS[spellType]:
+        print('BONUS ELEMENTAL DAMAGE!!!')
         return 2
     else:
         return 1
@@ -44,19 +45,33 @@ def shieldStatus(user):
     else:
         return 0
 
+def useSpell(spell, target, caster):
+    match spell:
+        case 'fireball':
+            fireball(caster, target)
+        case 'firebolt':
+            firebolt(caster, target)
+        case 'lava ground':
+            lavaGround(caster.name, target)
+        case 'grace':
+            grace(caster)
+        case 'sleep':
+            sleep(caster.name, target)
+        case 'thorn rain':
+            thornRain(caster, target)
+
 #spells-------------------
 def fireball(user, target):
     roll = dices.d10Roll()
-    damage = (10 + roll - target.res) * cew(target.element, 'fire') - shieldStatus(user)
+    damage = (10 + roll) * cew(target.element, 'fire') - shieldStatus(user)
 
-    print(target.element, cew(target.element, 'fire'))
 
     print(f'fireball does {damage} damage!')
     target.health -= damage
 
 def firebolt(user, target):
-    damage = (10 - target.res) * cew(target.element, 'fire') - shieldStatus(user)
-    
+    damage = (13) * cew(target.element, 'fire') - shieldStatus(user)
+
     print(f'fireball does {damage} damage!')
     target.health -= damage
 
