@@ -38,16 +38,24 @@ def cew(targetElement:str, spellType): #Check Elemental Weakness
     else:
         return 1
 
+def shieldStatus(user):
+    if user.shieldStatus():
+        return 5
+    else:
+        return 0
+
 #spells-------------------
-def fireball(target):
+def fireball(user, target):
     roll = dices.d10Roll()
-    damage = (10 + roll - target.res) * cew(target.element, 'fire')
+    damage = (10 + roll - target.res) * cew(target.element, 'fire') - shieldStatus(user)
+
+    print(target.element, cew(target.element, 'fire'))
 
     print(f'fireball does {damage} damage!')
     target.health -= damage
 
-def firebolt(target):
-    damage = (10 - target.res) * cew(target.element, 'fire')
+def firebolt(user, target):
+    damage = (10 - target.res) * cew(target.element, 'fire') - shieldStatus(user)
     
     print(f'fireball does {damage} damage!')
     target.health -= damage
@@ -75,10 +83,10 @@ def sleep(caster:str, target):
     else:
         print(f'{caster} missed the spell')
 
-def thornRain(target):
+def thornRain(user, target):
     damage = 0
     for i in range(3):
-        damage += dices.d6Roll()
+        damage += dices.d6Roll() - shieldStatus(user)
     
     target.health -= damage * cew(target.element, 'grass')
     print(f'thorns rain down upon {target.name}!')
