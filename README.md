@@ -20,7 +20,7 @@ Battle monsters, learn spells, and discover elemental reactions to survive in a 
 ```bash
 # Clone the repository
 git clone https://github.com/Lucas-Jahn_Vieira/game.git
-cd mystic-roguelike
+cd game
 
 # Run the game
 python game.py
